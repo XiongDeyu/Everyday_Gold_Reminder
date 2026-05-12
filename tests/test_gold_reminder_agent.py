@@ -2,6 +2,7 @@ import io
 import json
 import unittest
 from datetime import datetime, timezone
+from urllib.error import URLError
 from unittest.mock import patch
 
 import gold_reminder_agent as agent
@@ -49,6 +50,17 @@ class GoldReminderAgentTests(unittest.TestCase):
         self.assertIn("2026-05-12", msg)
         self.assertIn("已达到你设置的提醒阈值 2300.00", msg)
 
+    def test_build_reminder_message_below_threshold(self):
+        now = datetime(2026, 5, 12, tzinfo=timezone.utc)
+
+        msg = agent.build_reminder_message(
+            price=2200.00,
+            threshold=2300.00,
+            now=now,
+        )
+
+        self.assertIn("尚未达到提醒阈值 2300.00", msg)
+
     def test_run_daily_reminder_uses_notifier(self):
         output = io.StringIO()
 
@@ -59,6 +71,30 @@ class GoldReminderAgentTests(unittest.TestCase):
 
         self.assertEqual(output.getvalue(), message)
         self.assertIn("今日金价提醒", message)
+
+    @patch("gold_reminder_agent.urlopen")
+    def test_fetch_gold_price_raises_network_error(self, mock_urlopen):
+        mock_urlopen.side_effect = URLError("network down")
+
+        with self.assertRaises(URLError):
+            agent.fetch_gold_price()
+
+    @patch("gold_reminder_agent.urlopen")
+    def test_fetch_gold_price_raises_for_malformed_json(self, mock_urlopen):
+        class _BrokenResponse:
+            def read(self):
+                return b"{not-json"
+
+            def __enter__(self):
+                return self
+
+            def __exit__(self, exc_type, exc, tb):
+                return False
+
+        mock_urlopen.return_value = _BrokenResponse()
+
+        with self.assertRaises(json.JSONDecodeError):
+            agent.fetch_gold_price()
 
 
 if __name__ == "__main__":

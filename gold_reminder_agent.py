@@ -6,10 +6,12 @@ from datetime import datetime, timezone
 from typing import Callable, Optional
 from urllib.request import urlopen
 
+# Public endpoint expected to return JSON containing a numeric `price` field, e.g. {"price": 2375.12}.
 DEFAULT_API_URL = "https://api.gold-api.com/price/XAU"
 
 
 def fetch_gold_price(api_url: str = DEFAULT_API_URL, timeout: int = 10) -> float:
+    """Fetch current gold price (USD/oz) from the configured API endpoint."""
     with urlopen(api_url, timeout=timeout) as response:
         payload = json.loads(response.read().decode("utf-8"))
 
